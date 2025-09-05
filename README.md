@@ -1,0 +1,2 @@
+# MyImage
+利用了stb_image的三个头文件建立了一个Image类，用以对图像进行读写等操作
