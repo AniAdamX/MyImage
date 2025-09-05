@@ -1,41 +1,18 @@
-// !!! GB2312 Encoded !!!
-// 利用了stb_image的三个头文件建立了一个Image类，用以对图像进行读写等操作
-// 【作者：AniAdamX】
+//   Note: This file is encoded in GB2312!
+//   该文件声明了基于 stb_image 系列库的用于基础图像处理的 Image 类及其内部辅助类 ChannelType 和 Color。其
+// 支持在内存中新建空白图像或者从文件中读取图像，支持 1~4 通道（灰度、灰度+Alpha、RGB、RGBA）的每通道 8 bit
+// 的图像数据，提供单个像素的读取与设置（含原点在左下或左上两种索引方式）、整图着色、图像写出（png/tga/jpg/bmp
+// 格式）以及在 sRGB 或线性空间中进行尺寸缩放等接口。具体实现放在了 image.cpp 中。【作者：AniAdamX】
 #pragma once
 #ifndef MYIMAGE_IMAGE_H_
 #define MYIMAGE_IMAGE_H_
 
-#include <cassert> // assert()函数
-#include <cstring> // memcpy()函数
-
 #include <initializer_list>
-#include <stdexcept> // logic_error、out_of_range和runtime_error类
-#include <memory> // unique_ptr类
-#include <string_view>
+#include <memory> // 需要使用：unique_ptr类
 
-#define STB_IMAGE_IMPLEMENTATION
-#define STBI_FAILURE_USERMSG
-#include "include/stb_image.h"
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "include/stb_image_write.h"
-#define STB_IMAGE_RESIZE_IMPLEMENTATION
-#include "include/stb_image_resize2.h"
-
-using std::initializer_list;
-using std::logic_error;
-using std::memcpy;
-using std::out_of_range;
-using std::runtime_error;
-using std::string_view;
-using std::unique_ptr;
-
-void DeleteUCharArr(void* ptr)
-{
-    delete[] static_cast<unsigned char*>(ptr);
-}
-
-// 此处描述类的功能概括和用法例子
-// WriteToFile()函数仅支持PNG、TGA、JPG（JPEG）和BMP四种格式且后缀名需小写
+//   Image类，封装了 1~4 通道（灰度/灰度+Alpha/RGB/RGBA）且 8 bit 每通道的数字图像，支持图像读写、像素
+// 访问与尺寸缩放等常用操作。
+//   此处需要给出类的用法例子。
 class Image {
 public:
     // 强枚举类型定义的图像通道类别，其中kRgba中的a意思与kGrayAlpha的Alpha相同，即指alpha通道
@@ -43,56 +20,32 @@ public:
         kGray = 1, kGrayAlpha, kRgb, kRgba
     };
 
-    // 此处描述类的功能概括和用法例子
-    // 仅支持与ChannelType类型对应的通道类别，且每通道仅支持8比特位深（即值只能从0到255）
+    //   Color类，用于描述单个像素的颜色值，仅支持与ChannelType类型对应的通道类别，且每通道仅支持8比特位深
+    // （即值只能从0到255）。
+    //   此处需要给出类的用法例子。
     class Color {
     public:
-        // 构造函数一，使用int类型初始化列表作为参数
-        Color(initializer_list<int> init_list)
-        {
-            // 断言判断初始化列表中值的个数符合要求，且初始化值在有效范围内
-            assert(init_list.size() != 0 && init_list.size() < 5);
-            for (const auto& element : init_list)
-                assert(element >= 0 && element <= 255);
-
-            channel_type_ = static_cast<ChannelType>(init_list.size());
-            int index = 0;
-            for (const auto& element : init_list)
-                value_[index++] = element;
-        }
-        // 构造函数二，使用unsigned char数组（指针）和通道类型作为参数
-        Color(const unsigned char* arr, ChannelType channel_type)
-        {
-            channel_type_ = channel_type;
-            memcpy(value_, arr, static_cast<size_t>(channel_type_));
-        }
+        // 构造函数一：使用 int 类型初始化列表作为接收参数（元素个数决定通道类型 1~4，值范围 0~255）
+        Color(std::initializer_list<int> init_list);
+        // 构造函数二：从 unsigned char 数组与通道类型构造，数组中每个元素需存放着八比特的通道数据
+        Color(const unsigned char* arr, ChannelType channel_type);
         // 显式要求复制构造函数、赋值运算符函数和析构函数使用默认合成的版本
         Color(const Color&) = default;
         Color&  operator=(const Color&) = default;
         ~Color() = default;
 
-        // 获取或更改当前Color对象的通道类别
+        // 获取或更改当前 Color 对象的通道类别
         ChannelType channel_type() const
         { return channel_type_; }
         void set_channel_type(ChannelType channel_type)
         { channel_type_ = channel_type; }
-        // 获取或更改颜色值
+        // 获取或更改颜色值：value() 返回内部字节数组的首地址，每字节代表一个通道，注意有效数据与当前对象的通
+        // 道类别对应；value(i) 访问第 i 通道
         const unsigned char* value() const
         { return value_; }
-        int value(int index) const
-        {
-            if (index < 0 || index > (static_cast<int>(channel_type_) - 1))
-                throw out_of_range("取颜色值的索引小于零或超过当前对象的通道数目！");
-            return static_cast<int>(value_[index]);
-        }
-        void set_value(initializer_list<int> init_list)
-        {
-            if (init_list.size() != static_cast<decltype(init_list.size())>(channel_type_))
-                throw logic_error("设置颜色值时初始化值不符合当前对象的通道数目！");
-            int index = 0;
-            for (const auto& element : init_list)
-                value_[index++] = element;
-        }
+        int value(int index) const;
+        // 设置颜色值：初始化列表长度需等于当前通道数
+        void set_value(std::initializer_list<int> init_list);
 
     private:
         // 指示当前Color对象的通道类别
@@ -101,28 +54,12 @@ public:
         unsigned char value_[4];
     };
 
-    // 构造函数：创建一个指定分辨率和通道类型的空白图像（数值为全零）
-    Image(int width, int height, ChannelType channel_type) : width_(width), height_(height), channel_type_(channel_type),
-        data_(nullptr, DeleteUCharArr), flag_index_at_bottom_left_(true)
-    {
-        // 调用构造函数时不应该传入无效值（如果是用户输入则应该在调用构造函数前进行检查处理）
-        assert(width_ > 0 && height_ > 0);
-        // 无能力处理bad_alloc异常
-        data_.reset(new unsigned char[width_ * height_ * static_cast<int>(channel_type_)]());
-    }
-
-    // 构造函数：从文件中导入图像
-    Image(const char* path_to_file) : data_(nullptr, stbi_image_free), flag_index_at_bottom_left_(true)
-    {
-        int num_channels;
-        data_.reset(stbi_load(path_to_file, &width_, &height_, &num_channels, 0));
-
-        // 如果导入图像失败，无能力处理则就地抛出异常
-        if (!data_)
-            throw runtime_error(stbi_failure_reason());
-
-        channel_type_ = static_cast<ChannelType>(num_channels);
-    }
+    // 构造函数一：创建一个指定分辨率和通道类型的空白图像（数值为全零）
+    // 参数：width/height 横向或纵向的像素个数；channel_type 通道类型
+    Image(int width, int height, ChannelType channel_type);
+    // 构造函数二：从文件中导入图像（自动确定通道数）
+    // 说明：内部在导入失败时抛出 std::runtime_error 并携带失败原因
+    Image(const char* path_to_file);
 
     // 不希望使用拷贝构造函数和拷贝赋值运算符
     Image(const Image&) = delete;
@@ -130,110 +67,33 @@ public:
     // 使用默认的析构函数
     ~Image() = default;
 
-    // 将图像数据写入文件，成功返回true
-    bool WriteToFile(const char* path_to_file)
-    {
-        assert(data_);
-        // 获取文件后缀名
-        string_view str(path_to_file);
-        auto suffix_pos_minus_one = str.find_last_of('.');
-        if (suffix_pos_minus_one == str.npos)
-            return false;
-        string_view suffix = str.substr(suffix_pos_minus_one + 1);
-        // 依据后缀名调用stb_image_write库的函数
-        if (suffix == string_view("png"))
-            // 由于图像数据是连续存储的即无特定的内存对齐，因此此处调用时取参数stride_in_bytes = 0使其自动计算
-            return static_cast<bool>(stbi_write_png(path_to_file, width_, height_, static_cast<int>(channel_type_), data_.get(), 0));
-        else if (suffix == string_view("tga"))
-            return static_cast<bool>(stbi_write_tga(path_to_file, width_, height_, static_cast<int>(channel_type_), data_.get()));
-        else if (suffix == string_view("jpg") || suffix == string_view("jpeg"))
-            // 最后一个参数是设置JPG格式的压缩质量，0即表示使用库的默认值
-            return static_cast<bool>(stbi_write_jpg(path_to_file, width_, height_, static_cast<int>(channel_type_), data_.get(), 0));
-        else if (suffix == string_view("bmp"))
-            return static_cast<bool>(stbi_write_bmp(path_to_file, width_, height_, static_cast<int>(channel_type_), data_.get()));
-        else
-            return false;
-    }
+    // 将图像数据写入文件，成功返回 true
+    // 支持格式：png、tga、jpg/jpeg、bmp（后缀需小写）
+    bool WriteToFile(const char* path_to_file);
 
-    void ResizeInSrgbSpace(int new_width, int new_height)
-    {
-        assert(data_);
-        assert(new_width > 0 && new_height > 0);
-
-        unsigned char* new_data = new unsigned char[new_width * new_height * static_cast<int>(channel_type_)];
-        stbir_resize_uint8_srgb(data_.get(), width_, height_, 0, new_data, new_width, new_height, 0,
-            static_cast<stbir_pixel_layout>(channel_type_)); // 返回0表示出现错误
-        data_.reset(new_data);
-        data_.get_deleter() = DeleteUCharArr;
-        width_ = new_width;
-        height_ = new_height;
-    }
-
-    void ResizeInLinearSpace(int new_width, int new_height)
-    {
-        assert(data_);
-        assert(new_width > 0 && new_height > 0);
-
-        unsigned char* new_data = new unsigned char[new_width * new_height * static_cast<int>(channel_type_)];
-        stbir_resize_uint8_linear(data_.get(), width_, height_, 0, new_data, new_width, new_height, 0,
-            static_cast<stbir_pixel_layout>(channel_type_)); // 返回0表示出现错误
-        data_.reset(new_data);
-        data_.get_deleter() = DeleteUCharArr;
-        width_ = new_width;
-        height_ = new_height;
-    }
+    // 图像缩放（sRGB 空间）
+    void ResizeInSrgbSpace(int new_width, int new_height);
+    // 图像缩放（线性空间）
+    void ResizeInLinearSpace(int new_width, int new_height);
 
     // 部分取值函数
     int width() const
     { return width_; }
     int height() const
-    { return height_;}
+    { return height_; }
     ChannelType channel_type() const
     { return channel_type_; }
-    // 获取或更改像素索引时原点位置标志量
-    bool flag_index_at_bottom_left()  const
+    // 获取或更改像素索引时原点位置标志量（true是左下角，false是左上角）
+    bool flag_index_at_bottom_left() const
     { return flag_index_at_bottom_left_; }
     void set_flag_index_at_bottom_left(bool flag_index_at_bottom_left)
     { flag_index_at_bottom_left_ = flag_index_at_bottom_left; }
     // 获取图像单个像素的颜色
-    Color GetPixelColor(int x_index, int y_index) const
-    {
-        assert(data_);
-        if (x_index < 0 || y_index < 0 || x_index >= width_ || y_index >= height_)
-            throw out_of_range("在对像素进行索引时超出范围！");
-        
-        int pixel_pos = flag_index_at_bottom_left_ ? ((height_ - 1 - y_index) * width_ + width_)
-            : (y_index * width_ + x_index);
-        unsigned char* pixel_ptr = data_.get() + pixel_pos * static_cast<int>(channel_type_);
-        return Color(pixel_ptr, channel_type_);
-    }
+    Color GetPixelColor(int x_index, int y_index) const;
     // 更改图像单个像素的颜色
-    void SetPixelColor(int x_index, int y_index, const Color& color)
-    {
-        assert(data_);
-        if (x_index < 0 || y_index < 0 || x_index >= width_ || y_index >= height_)
-            throw out_of_range("在对像素进行索引时超出范围！");
-        if (color.channel_type() != channel_type_)
-            throw logic_error("传入的颜色的通道类别与图像的通道类别不同！");
-
-        int pixel_pos = flag_index_at_bottom_left_ ? ((height_ - 1 - y_index) * width_ + x_index)
-            : (y_index * width_ + x_index);
-        unsigned char* pixel_ptr = data_.get() + pixel_pos * static_cast<int>(channel_type_);
-        memcpy(pixel_ptr, color.value(), static_cast<size_t>(channel_type_));
-    }
+    void SetPixelColor(int x_index, int y_index, const Color& color);
     // 更改全部像素的颜色
-    void SetAllPixelColor(const Color& color)
-    {
-        assert(data_);
-        bool temp = flag_index_at_bottom_left_;
-
-        // 设置像素索引原点位于左上角以减少运算量
-        flag_index_at_bottom_left_ = false;
-        for (int x = 0; x < width_; ++x)
-            for (int y = 0; y < height_; ++y)
-                SetPixelColor(x, y, color);
-        flag_index_at_bottom_left_ = temp;
-    }
+    void SetAllPixelColor(const Color& color);
 
 private:
     // 图像横向像素个数
@@ -242,8 +102,8 @@ private:
     int height_;
     // 图像通道类别
     ChannelType channel_type_;
-    // 指向图像数据数组的指针（原始数据图像原点是）
-    unique_ptr<unsigned char, void(*)(void*)> data_;
+    // 指向图像数据数组的指针
+    std::unique_ptr<unsigned char, void(*)(void*)> data_;
     // 指示在对像素索引时图像原点是否在左下角的标志，默认是true，false意味着图像原点在右上角
     bool flag_index_at_bottom_left_;
 };
