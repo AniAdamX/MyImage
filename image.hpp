@@ -15,11 +15,11 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_FAILURE_USERMSG
-#include "stb_image.h"
+#include "include/stb_image.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
+#include "include/stb_image_write.h"
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
-#include "stb_image_resize2.h"
+#include "include/stb_image_resize2.h"
 
 using std::initializer_list;
 using std::logic_error;

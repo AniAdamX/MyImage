@@ -5,9 +5,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 project(MyImage)
 
 file(GLOB SRC_FILES
-	"${PROJECT_SOURCE_DIR}/*.h"
+	"${PROJECT_SOURCE_DIR}/include/*.h"
 	"${PROJECT_SOURCE_DIR}/*.hpp"
-	"${PROJECT_SOURCE_DIR}/*.cpp"
-	"${PROJECT_SOURCE_DIR}/*.cc")
+	"${PROJECT_SOURCE_DIR}/*.cpp")
 
 add_executable(${CMAKE_PROJECT_NAME} ${SRC_FILES})
